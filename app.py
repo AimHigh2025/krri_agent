@@ -19,8 +19,13 @@ BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = "krri-kpi-dashboard-dev-key"
-app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///" + os.path.join(BASE_DIR, "kpi.db")
+
+# Vercel 서버리스 환경은 /tmp만 쓰기 가능
+IS_VERCEL = os.environ.get("VERCEL", False)
+DB_PATH = "/tmp/kpi.db" if IS_VERCEL else os.path.join(BASE_DIR, "kpi.db")
+app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///" + DB_PATH
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+
 
 db.init_app(app)
 
