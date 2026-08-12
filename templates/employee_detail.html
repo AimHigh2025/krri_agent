@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+{% block title %}{{ employee.name }} - KRRI KPI 대시보드{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">{{ employee.name }}</h1>
+    <div class="page-sub">
+      {{ employee.department or '-' }} · {{ employee.position or '-' }}
+      {% if employee.role_title %}· {{ employee.role_title }}{% endif %}
+      {% if employee.emp_no %}· 사번 {{ employee.emp_no }}{% endif %}
+    </div>
+  </div>
+  <div class="d-flex align-items-center gap-2">
+    {% if periods %}
+    <form class="d-flex align-items-center gap-2" method="get">
+      <select name="period" class="form-select form-select-sm" onchange="this.form.submit()">
+        {% for p in periods %}
+          <option value="{{ p }}" {% if p == period %}selected{% endif %}>{{ p }}</option>
+        {% endfor %}
+      </select>
+    </form>
+    {% endif %}
+    <a class="btn btn-sm btn-primary" href="{{ url_for('score_entry', employee_id=employee.id, period=period) }}">평가 입력</a>
+    <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('employee_edit', emp_id=employee.id) }}">정보 수정</a>
+  </div>
+</div>
+
+<div class="stat-grid" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));">
+  <div class="stat-tile">
+    <div class="stat-label">{{ period or '-' }} 종합 점수</div>
+    <div class="stat-value">{{ overall if overall is not none else '-' }}<small> 점</small></div>
+  </div>
+  <div class="stat-tile">
+    <div class="stat-label">등급</div>
+    <div class="stat-value"><span class="grade-badge grade-{{ grade }}">{{ grade }}</span></div>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-lg-6">
+    <div class="chart-card">
+      <h6>항목별 점수 ({{ period or '-' }})</h6>
+      <div style="position:relative; height:280px;">
+        <canvas id="itemRadar"></canvas>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="chart-card">
+      <h6>기간별 종합 점수 추이</h6>
+      <div style="position:relative; height:280px;">
+        <canvas id="trendChart"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="chart-card">
+  <h6>항목별 상세 ({{ period or '-' }})</h6>
+  <div class="table-responsive">
+    <table class="table align-middle mb-0">
+      <thead>
+        <tr>
+          <th>KPI 항목</th>
+          <th>가중치</th>
+          <th>목표</th>
+          <th>실적</th>
+          <th>환산 점수</th>
+          <th>비고</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in item_scores %}
+        <tr>
+          <td>{{ s.kpi_item.name }}</td>
+          <td>{{ s.kpi_item.weight }}%</td>
+          <td>{{ s.target_value if s.target_value is not none else '-' }} {{ s.kpi_item.unit or '' }}</td>
+          <td>{{ s.actual_value if s.actual_value is not none else '-' }} {{ s.kpi_item.unit or '' }}</td>
+          <td class="fw-semibold">{{ s.score if s.score is not none else '-' }}</td>
+          <td class="text-muted">{{ s.note or '-' }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" class="text-center text-muted py-4">해당 기간의 평가 데이터가 없습니다.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const cs = getComputedStyle(document.documentElement);
+const c = (name) => cs.getPropertyValue(name).trim();
+Chart.defaults.font.family = "system-ui, -apple-system, 'Segoe UI', 'Malgun Gothic', sans-serif";
+Chart.defaults.color = c('--text-secondary');
+
+const radarLabels = {{ item_scores|map(attribute='kpi_item.name')|list|tojson }};
+const radarScores = {{ item_scores|map(attribute='score')|list|tojson }};
+new Chart(document.getElementById('itemRadar'), {
+  type: 'radar',
+  data: {
+    labels: radarLabels,
+    datasets: [{
+      label: '{{ employee.name }}',
+      data: radarScores,
+      backgroundColor: 'rgba(42, 120, 214, 0.18)',
+      borderColor: c('--series-1'),
+      pointBackgroundColor: c('--series-1'),
+      borderWidth: 2,
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: {
+      r: {
+        min: 0, max: 100,
+        angleLines: { color: c('--gridline') },
+        grid: { color: c('--gridline') },
+        pointLabels: { color: c('--text-secondary'), font: { size: 11 } },
+        ticks: { display: false, backdropColor: 'transparent' }
+      }
+    }
+  }
+});
+
+const trendLabels = {{ history|map(attribute='period')|list|tojson }};
+const trendScores = {{ history|map(attribute='score')|list|tojson }};
+new Chart(document.getElementById('trendChart'), {
+  type: 'line',
+  data: {
+    labels: trendLabels,
+    datasets: [{
+      label: '종합 점수',
+      data: trendScores,
+      borderColor: c('--series-1'),
+      backgroundColor: 'rgba(42, 120, 214, 0.12)',
+      pointBackgroundColor: c('--series-1'),
+      borderWidth: 2,
+      tension: 0.25,
+      fill: true,
+      pointRadius: 4,
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: {
+      y: { min: 0, max: 100, grid: { color: c('--gridline') }, ticks: { color: c('--text-muted') } },
+      x: { grid: { display: false }, ticks: { color: c('--text-primary') } }
+    }
+  }
+});
+</script>
+{% endblock %}

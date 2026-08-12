@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}직원 관리 - KRRI KPI 대시보드{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">직원 관리</h1>
+    <div class="page-sub">평가 대상 직원 정보를 등록하고 관리합니다.</div>
+  </div>
+  <a class="btn btn-primary btn-sm" href="{{ url_for('employee_new') }}">+ 직원 등록</a>
+</div>
+
+<form class="mb-3" method="get" style="max-width:320px;">
+  <input type="text" class="form-control form-control-sm" name="q" value="{{ q }}" placeholder="이름, 부서, 사번 검색" onchange="this.form.submit()">
+</form>
+
+<div class="chart-card">
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead>
+        <tr>
+          <th>이름</th>
+          <th>사번</th>
+          <th>부서</th>
+          <th>직급</th>
+          <th>보직</th>
+          <th>이메일</th>
+          <th style="width:160px;"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for emp in employees %}
+        <tr>
+          <td><a href="{{ url_for('employee_detail', emp_id=emp.id) }}" class="text-decoration-none fw-semibold">{{ emp.name }}</a></td>
+          <td>{{ emp.emp_no or '-' }}</td>
+          <td>{{ emp.department or '-' }}</td>
+          <td>{{ emp.position or '-' }}</td>
+          <td>{{ emp.role_title or '-' }}</td>
+          <td>{{ emp.email or '-' }}</td>
+          <td class="text-end">
+            <a href="{{ url_for('employee_edit', emp_id=emp.id) }}" class="btn btn-sm btn-outline-secondary">수정</a>
+            <form method="post" action="{{ url_for('employee_delete', emp_id=emp.id) }}" class="d-inline"
+                  onsubmit="return confirm('{{ emp.name }} 직원을 삭제하시겠습니까? 관련 평가 데이터도 함께 삭제됩니다.');">
+              <button type="submit" class="btn btn-sm btn-outline-danger">삭제</button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" class="text-center text-muted py-4">등록된 직원이 없습니다.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

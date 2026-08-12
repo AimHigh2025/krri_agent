@@ -1,0 +1,223 @@
+{% extends "base.html" %}
+{% block title %}대시보드 - KRRI KPI 대시보드{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">KPI 대시보드</h1>
+    <div class="page-sub">보직자용 팀 성과 관리 현황판</div>
+  </div>
+  <div class="d-flex align-items-center gap-2">
+    {% if periods %}
+    <form class="d-flex align-items-center gap-2" method="get">
+      <select name="period" class="form-select form-select-sm" onchange="this.form.submit()">
+        {% for p in periods %}
+          <option value="{{ p }}" {% if p == period %}selected{% endif %}>{{ p }}</option>
+        {% endfor %}
+      </select>
+    </form>
+    {% endif %}
+    <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('export_csv', period=period) }}">CSV 내보내기</a>
+  </div>
+</div>
+
+{% if not periods %}
+  <div class="card p-4 text-center">
+    <p class="mb-3">아직 등록된 평가 데이터가 없습니다.</p>
+    <a href="{{ url_for('score_entry') }}" class="btn btn-primary btn-sm align-self-center">평가 입력하러 가기</a>
+  </div>
+{% else %}
+
+<div class="stat-grid">
+  <div class="stat-tile">
+    <div class="stat-label">전체 인원</div>
+    <div class="stat-value">{{ total_employees }}<small> 명</small></div>
+  </div>
+  <div class="stat-tile">
+    <div class="stat-label">{{ period }} 평가 완료</div>
+    <div class="stat-value">{{ rows|length }}<small> / {{ total_employees }} 명</small></div>
+  </div>
+  <div class="stat-tile">
+    <div class="stat-label">팀 평균 점수</div>
+    <div class="stat-value">{{ avg_score if avg_score is not none else '-' }}<small> 점</small></div>
+  </div>
+  <div class="stat-tile">
+    <div class="stat-label">최고 점수자</div>
+    <div class="stat-value" style="font-size:1.1rem;">
+      {% if top_row %}{{ top_row.employee.name }} <small>({{ top_row.score }}점)</small>{% else %}-{% endif %}
+    </div>
+  </div>
+  <div class="stat-tile">
+    <div class="stat-label">최저 점수자</div>
+    <div class="stat-value" style="font-size:1.1rem;">
+      {% if bottom_row %}{{ bottom_row.employee.name }} <small>({{ bottom_row.score }}점)</small>{% else %}-{% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-lg-7">
+    <div class="chart-card">
+      <h6>직원별 종합 점수 순위</h6>
+      <div style="position:relative; height:{{ (rows|length * 34 + 40) if rows else 120 }}px;">
+        <canvas id="rankChart"></canvas>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-5">
+    <div class="chart-card">
+      <h6>부서별 평균 점수</h6>
+      <div style="position:relative; height:220px;">
+        <canvas id="deptChart"></canvas>
+      </div>
+    </div>
+    <div class="chart-card">
+      <h6>KPI 항목별 팀 평균</h6>
+      <div style="position:relative; height:240px;">
+        <canvas id="itemChart"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="chart-card">
+  <h6>직원별 순위표 ({{ period }})</h6>
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead>
+        <tr>
+          <th style="width:50px;">순위</th>
+          <th>이름</th>
+          <th>부서</th>
+          <th>직급/보직</th>
+          <th>종합 점수</th>
+          <th>등급</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+        <tr>
+          <td>
+            <span class="rank-number {% if loop.index == 1 %}rank-1{% elif loop.index == 2 %}rank-2{% elif loop.index == 3 %}rank-3{% endif %}">{{ loop.index }}</span>
+          </td>
+          <td>{{ r.employee.name }}</td>
+          <td>{{ r.employee.department or '-' }}</td>
+          <td>{{ r.employee.position or '-' }}{% if r.employee.role_title %} · {{ r.employee.role_title }}{% endif %}</td>
+          <td class="fw-semibold">{{ r.score }}점</td>
+          <td><span class="grade-badge grade-{{ r.grade }}">{{ r.grade }}</span></td>
+          <td><a href="{{ url_for('employee_detail', emp_id=r.employee.id, period=period) }}" class="btn btn-sm btn-outline-secondary">상세</a></td>
+        </tr>
+        {% endfor %}
+        {% for r in unscored_rows %}
+        <tr class="text-muted">
+          <td>-</td>
+          <td>{{ r.employee.name }}</td>
+          <td>{{ r.employee.department or '-' }}</td>
+          <td>{{ r.employee.position or '-' }}{% if r.employee.role_title %} · {{ r.employee.role_title }}{% endif %}</td>
+          <td>미입력</td>
+          <td><span class="grade-badge grade-\-">-</span></td>
+          <td><a href="{{ url_for('score_entry', employee_id=r.employee.id, period=period) }}" class="btn btn-sm btn-outline-primary">평가 입력</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if periods %}
+<script>
+const cs = getComputedStyle(document.documentElement);
+const c = (name) => cs.getPropertyValue(name).trim();
+Chart.defaults.font.family = "system-ui, -apple-system, 'Segoe UI', 'Malgun Gothic', sans-serif";
+Chart.defaults.color = c('--text-secondary');
+
+const rankLabels = {{ rows|map(attribute='employee.name')|list|tojson }};
+const rankScores = {{ rows|map(attribute='score')|list|tojson }};
+new Chart(document.getElementById('rankChart'), {
+  type: 'bar',
+  data: {
+    labels: rankLabels,
+    datasets: [{
+      label: '종합 점수',
+      data: rankScores,
+      backgroundColor: c('--series-1'),
+      borderRadius: 4,
+      maxBarThickness: 22,
+    }]
+  },
+  options: {
+    indexAxis: 'y',
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { min: 0, max: 100, grid: { color: c('--gridline') }, ticks: { color: c('--text-muted') } },
+      y: { grid: { display: false }, ticks: { color: c('--text-primary') } }
+    }
+  }
+});
+
+const deptLabels = {{ dept_avg.keys()|list|tojson }};
+const deptScores = {{ dept_avg.values()|list|tojson }};
+const deptColors = [c('--series-1'), c('--series-2'), c('--series-3'), c('--series-4'), c('--series-5')];
+new Chart(document.getElementById('deptChart'), {
+  type: 'bar',
+  data: {
+    labels: deptLabels,
+    datasets: [{
+      label: '부서 평균',
+      data: deptScores,
+      backgroundColor: deptLabels.map((_, i) => deptColors[i % deptColors.length]),
+      borderRadius: 4,
+      maxBarThickness: 36,
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: {
+      y: { min: 0, max: 100, grid: { color: c('--gridline') }, ticks: { color: c('--text-muted') } },
+      x: { grid: { display: false }, ticks: { color: c('--text-primary') } }
+    }
+  }
+});
+
+const itemLabels = {{ item_avg.keys()|list|tojson }};
+const itemScores = {{ item_avg.values()|list|tojson }};
+new Chart(document.getElementById('itemChart'), {
+  type: 'radar',
+  data: {
+    labels: itemLabels,
+    datasets: [{
+      label: '팀 평균',
+      data: itemScores,
+      backgroundColor: 'rgba(42, 120, 214, 0.18)',
+      borderColor: c('--series-1'),
+      pointBackgroundColor: c('--series-1'),
+      borderWidth: 2,
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: {
+      r: {
+        min: 0, max: 100,
+        angleLines: { color: c('--gridline') },
+        grid: { color: c('--gridline') },
+        pointLabels: { color: c('--text-secondary'), font: { size: 11 } },
+        ticks: { display: false, backdropColor: 'transparent' }
+      }
+    }
+  }
+});
+</script>
+{% endif %}
+{% endblock %}

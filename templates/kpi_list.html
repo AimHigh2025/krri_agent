@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}KPI 항목 관리 - KRRI KPI 대시보드{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">KPI 항목 관리</h1>
+    <div class="page-sub">
+      평가에 사용할 KPI 항목과 가중치를 관리합니다. 활성 항목 가중치 합계:
+      <span class="{{ 'weight-total-ok' if total_weight == 100 else 'weight-total-warn' }}">{{ total_weight }}%</span>
+      {% if total_weight != 100 %}<span class="text-muted">(100%가 되도록 조정을 권장합니다)</span>{% endif %}
+    </div>
+  </div>
+  <a class="btn btn-primary btn-sm" href="{{ url_for('kpi_new') }}">+ KPI 항목 등록</a>
+</div>
+
+<div class="chart-card">
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead>
+        <tr>
+          <th>항목명</th>
+          <th>설명</th>
+          <th>가중치</th>
+          <th>단위</th>
+          <th>평가 방향</th>
+          <th>상태</th>
+          <th style="width:160px;"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in items %}
+        <tr class="{% if not item.active %}text-muted{% endif %}">
+          <td class="fw-semibold">{{ item.name }}</td>
+          <td>{{ item.description or '-' }}</td>
+          <td>{{ item.weight }}%</td>
+          <td>{{ item.unit or '-' }}</td>
+          <td>{{ '높을수록 좋음' if item.direction == 'higher' else '낮을수록 좋음' }}</td>
+          <td>
+            {% if item.active %}<span class="badge text-bg-success">사용중</span>{% else %}<span class="badge text-bg-secondary">비활성</span>{% endif %}
+          </td>
+          <td class="text-end">
+            <a href="{{ url_for('kpi_edit', item_id=item.id) }}" class="btn btn-sm btn-outline-secondary">수정</a>
+            <form method="post" action="{{ url_for('kpi_delete', item_id=item.id) }}" class="d-inline"
+                  onsubmit="return confirm('{{ item.name }} 항목을 삭제하시겠습니까? 관련 평가 데이터도 함께 삭제됩니다.');">
+              <button type="submit" class="btn btn-sm btn-outline-danger">삭제</button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" class="text-center text-muted py-4">등록된 KPI 항목이 없습니다.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

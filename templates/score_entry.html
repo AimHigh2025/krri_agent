@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}평가 입력 - KRRI KPI 대시보드{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">평가 입력</h1>
+    <div class="page-sub">직원과 평가 기간을 선택한 뒤 KPI 항목별 목표/실적을 입력하세요.</div>
+  </div>
+</div>
+
+<div class="chart-card">
+  <form method="get" class="row g-2 align-items-end">
+    <div class="col-md-4">
+      <label class="form-label">직원</label>
+      <select name="employee_id" class="form-select" onchange="this.form.submit()">
+        {% for emp in employees %}
+          <option value="{{ emp.id }}" {% if emp.id == sel_emp_id %}selected{% endif %}>
+            {{ emp.name }} ({{ emp.department or '미지정' }})
+          </option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">기존 기간 불러오기</label>
+      <select class="form-select" onchange="if(this.value){ window.location = '{{ url_for('score_entry') }}?employee_id={{ sel_emp_id }}&period=' + encodeURIComponent(this.value); }">
+        <option value="">-- 새 기간 입력 --</option>
+        {% for p in periods %}
+          <option value="{{ p }}" {% if p == sel_period %}selected{% endif %}>{{ p }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <input type="hidden" name="period" value="{{ sel_period }}">
+  </form>
+</div>
+
+<form method="post" class="chart-card">
+  <input type="hidden" name="employee_id" value="{{ sel_emp_id }}">
+
+  <div class="row g-2 mb-3">
+    <div class="col-md-4">
+      <label class="form-label">평가 기간 *</label>
+      <input type="text" class="form-control" name="period" list="period-list" required
+             placeholder="예: 2026-Q3" value="{{ sel_period }}">
+      <datalist id="period-list">
+        {% for p in periods %}<option value="{{ p }}">{% endfor %}
+      </datalist>
+    </div>
+  </div>
+
+  <div class="table-responsive">
+    <table class="table align-middle mb-0">
+      <thead>
+        <tr>
+          <th>KPI 항목</th>
+          <th style="width:130px;">목표</th>
+          <th style="width:130px;">실적</th>
+          <th style="width:90px;">환산점수</th>
+          <th>비고</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in items %}
+        {% set rec = existing.get(item.id) %}
+        <tr>
+          <td>
+            <div class="fw-semibold">{{ item.name }}</div>
+            <div class="text-muted" style="font-size:0.78rem;">
+              가중치 {{ item.weight }}% · {{ '높을수록 좋음' if item.direction == 'higher' else '낮을수록 좋음' }}
+              {% if item.unit %}· 단위 {{ item.unit }}{% endif %}
+            </div>
+          </td>
+          <td><input type="number" step="0.01" class="form-control form-control-sm" name="target_{{ item.id }}" value="{{ rec.target_value if rec and rec.target_value is not none else '' }}"></td>
+          <td><input type="number" step="0.01" class="form-control form-control-sm" name="actual_{{ item.id }}" value="{{ rec.actual_value if rec and rec.actual_value is not none else '' }}"></td>
+          <td class="text-muted">{{ rec.score if rec and rec.score is not none else '-' }}</td>
+          <td><input type="text" class="form-control form-control-sm" name="note_{{ item.id }}" value="{{ rec.note if rec and rec.note else '' }}"></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="mt-4 d-flex gap-2">
+    <button type="submit" class="btn btn-primary">저장</button>
+    <a href="{{ url_for('employee_detail', emp_id=sel_emp_id) }}" class="btn btn-outline-secondary">직원 상세로 이동</a>
+  </div>
+</form>
+{% endblock %}

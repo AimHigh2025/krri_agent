@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}{{ '직원 수정' if employee else '직원 등록' }} - KRRI KPI 대시보드{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">{{ '직원 정보 수정' if employee else '직원 등록' }}</h1>
+  </div>
+</div>
+
+<div class="form-card">
+  <form method="post">
+    <div class="row g-3">
+      <div class="col-md-6">
+        <label class="form-label">이름 *</label>
+        <input type="text" class="form-control" name="name" required value="{{ employee.name if employee else '' }}">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">사번</label>
+        <input type="text" class="form-control" name="emp_no" value="{{ employee.emp_no if employee and employee.emp_no else '' }}">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">부서</label>
+        <input type="text" class="form-control" name="department" value="{{ employee.department if employee and employee.department else '' }}">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">직급</label>
+        <input type="text" class="form-control" name="position" placeholder="예: 선임연구원" value="{{ employee.position if employee and employee.position else '' }}">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">보직</label>
+        <input type="text" class="form-control" name="role_title" placeholder="예: 팀장, 파트장" value="{{ employee.role_title if employee and employee.role_title else '' }}">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">입사일</label>
+        <input type="text" class="form-control" name="hire_date" placeholder="예: 2020-03-01" value="{{ employee.hire_date if employee and employee.hire_date else '' }}">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">이메일</label>
+        <input type="email" class="form-control" name="email" value="{{ employee.email if employee and employee.email else '' }}">
+      </div>
+      <div class="col-12">
+        <label class="form-label">비고</label>
+        <textarea class="form-control" name="memo" rows="2">{{ employee.memo if employee and employee.memo else '' }}</textarea>
+      </div>
+    </div>
+    <div class="mt-4 d-flex gap-2">
+      <button type="submit" class="btn btn-primary">저장</button>
+      <a href="{{ url_for('employee_list') }}" class="btn btn-outline-secondary">취소</a>
+    </div>
+  </form>
+</div>
+{% endblock %}
