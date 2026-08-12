@@ -2,6 +2,7 @@ import csv
 import io
 import os
 from datetime import datetime
+from functools import wraps
 
 from flask import (
     Flask,
@@ -10,6 +11,7 @@ from flask import (
     render_template,
     request,
     Response,
+    session,
     url_for,
 )
 
@@ -28,6 +30,21 @@ app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 
 db.init_app(app)
+
+# ---------------------------------------------------------------- 관리자 계정
+ADMIN_USERNAME = "admin"
+ADMIN_PASSWORD = "check**"
+
+
+def login_required(f):
+    """로그인하지 않은 사용자를 로그인 페이지로 리다이렉트하는 데코레이터"""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not session.get("logged_in"):
+            flash("로그인이 필요합니다.", "warning")
+            return redirect(url_for("login"))
+        return f(*args, **kwargs)
+    return decorated
 
 
 def grade_of(score):
@@ -55,8 +72,32 @@ def latest_period():
     return periods[0] if periods else None
 
 
+# ---------------------------------------------------------------- 로그인 / 로그아웃
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if session.get("logged_in"):
+        return redirect(url_for("dashboard"))
+    if request.method == "POST":
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "")
+        if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
+            session["logged_in"] = True
+            session["username"] = username
+            return redirect(url_for("dashboard"))
+        flash("아이디 또는 비밀번호가 올바르지 않습니다.", "error")
+    return render_template("login.html")
+
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    flash("로그아웃 되었습니다.", "success")
+    return redirect(url_for("login"))
+
+
 # ---------------------------------------------------------------- 대시보드
 @app.route("/")
+@login_required
 def dashboard():
     period = request.args.get("period") or latest_period()
     periods = all_periods()
@@ -115,6 +156,7 @@ def dashboard():
 
 # ---------------------------------------------------------------- 직원 관리
 @app.route("/employees")
+@login_required
 def employee_list():
     q = request.args.get("q", "").strip()
     query = Employee.query
@@ -129,6 +171,7 @@ def employee_list():
 
 
 @app.route("/employees/new", methods=["GET", "POST"])
+@login_required
 def employee_new():
     if request.method == "POST":
         emp = Employee(
@@ -149,6 +192,7 @@ def employee_new():
 
 
 @app.route("/employees/<int:emp_id>/edit", methods=["GET", "POST"])
+@login_required
 def employee_edit(emp_id):
     emp = Employee.query.get_or_404(emp_id)
     if request.method == "POST":
@@ -167,6 +211,7 @@ def employee_edit(emp_id):
 
 
 @app.route("/employees/<int:emp_id>/delete", methods=["POST"])
+@login_required
 def employee_delete(emp_id):
     emp = Employee.query.get_or_404(emp_id)
     db.session.delete(emp)
@@ -176,6 +221,7 @@ def employee_delete(emp_id):
 
 
 @app.route("/employees/<int:emp_id>")
+@login_required
 def employee_detail(emp_id):
     emp = Employee.query.get_or_404(emp_id)
     periods = all_periods()
@@ -209,6 +255,7 @@ def employee_detail(emp_id):
 
 # ---------------------------------------------------------------- KPI 항목 관리
 @app.route("/kpis")
+@login_required
 def kpi_list():
     items = KPIItem.query.order_by(KPIItem.active.desc(), KPIItem.name).all()
     total_weight = sum(i.weight or 0 for i in items if i.active)
@@ -216,6 +263,7 @@ def kpi_list():
 
 
 @app.route("/kpis/new", methods=["GET", "POST"])
+@login_required
 def kpi_new():
     if request.method == "POST":
         item = KPIItem(
@@ -234,6 +282,7 @@ def kpi_new():
 
 
 @app.route("/kpis/<int:item_id>/edit", methods=["GET", "POST"])
+@login_required
 def kpi_edit(item_id):
     item = KPIItem.query.get_or_404(item_id)
     if request.method == "POST":
@@ -256,6 +305,7 @@ def kpi_edit(item_id):
 
 
 @app.route("/kpis/<int:item_id>/delete", methods=["POST"])
+@login_required
 def kpi_delete(item_id):
     item = KPIItem.query.get_or_404(item_id)
     db.session.delete(item)
@@ -266,6 +316,7 @@ def kpi_delete(item_id):
 
 # ---------------------------------------------------------------- 평가 입력
 @app.route("/scores", methods=["GET", "POST"])
+@login_required
 def score_entry():
     employees = Employee.query.order_by(Employee.department, Employee.name).all()
     items = KPIItem.query.filter_by(active=True).order_by(KPIItem.name).all()
@@ -329,6 +380,7 @@ def score_entry():
 
 # ---------------------------------------------------------------- 내보내기(CSV)
 @app.route("/export.csv")
+@login_required
 def export_csv():
     period = request.args.get("period") or latest_period()
     employees = Employee.query.order_by(Employee.department, Employee.name).all()
